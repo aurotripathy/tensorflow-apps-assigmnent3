@@ -44,18 +44,40 @@ print('Test set', test_dataset.shape, test_labels.shape)
 
 # The knobs and dials!
 batch_size = 128
-hidden_nodes = 1024 #tried double the cells
+hidden_nodes = 2048 #tried double the cells
+hidden_nodes_l2 = 512
 starter_learn_rate = 0.5
 reg_beta = 5e-4
-num_steps = 20001
+num_steps = 200001
 
 #flow the data sets thru the layers
-def flowNN3Layer(d_set):
+def flowNN2Layer(d_set):
     # Training computation.
     h_logits = tf.nn.relu(tf.matmul(d_set, weights_1) + biases_1)
     logits_dropout_in = tf.matmul(h_logits, weights_2) + biases_2
     logits = tf.nn.dropout(logits_dropout_in, keep_prob)
     return logits
+
+def flowNN3Layer(d_set, use_dropout):
+    # Training computation.
+
+    h1_logits = tf.nn.relu(tf.matmul(d_set, weights_1) + biases_1)
+
+    h2_logits = None
+    if use_dropout:
+        h1_dropout = tf.nn.dropout(h1_logits, keep_prob)
+        h2_logits = tf.nn.relu(tf.matmul(h1_dropout, weights_2) + biases_2)
+    else:
+        h2_logits = tf.nn.relu(tf.matmul(h1_logits, weights_2) + biases_2)
+
+    h3_logits = None
+    if use_dropout:
+        h2_dropout = tf.nn.dropout(h2_logits, keep_prob)
+        h3_logits = tf.nn.relu(tf.matmul(h2_dropout, weights_3) + biases_3)
+    else:
+        h3_logits = tf.nn.relu(tf.matmul(h2_logits, weights_3) + biases_3)
+
+    return h3_logits
 
 # graph with stochastic gradient descent
 graph = tf.Graph()
@@ -73,16 +95,16 @@ with graph.as_default():
     weights_1 = tf.Variable(tf.truncated_normal([image_size * image_size, hidden_nodes], stddev=0.03))
     biases_1 = tf.Variable(tf.zeros([hidden_nodes]))
 
-    weights_2 = tf.Variable(tf.truncated_normal([hidden_nodes, num_labels]))
-    biases_2 = tf.Variable(tf.zeros([num_labels]))
+    weights_2 = tf.Variable(tf.truncated_normal([hidden_nodes, hidden_nodes_l2], stddev=0.01))
+    biases_2 = tf.Variable(tf.zeros([hidden_nodes_l2]))
 
-
-
+    weights_3 = tf.Variable(tf.truncated_normal([hidden_nodes_l2, num_labels], stddev=0.01))
+    biases_3 = tf.Variable(tf.zeros([num_labels]))
 
     # computation
-    logits = flowNN3Layer(tf_train_dataset)
-    logits_valid = flowNN3Layer(tf_valid_dataset)
-    logits_test = flowNN3Layer(tf_test_dataset)
+    logits = flowNN3Layer(tf_train_dataset, True)
+    logits_valid = flowNN3Layer(tf_valid_dataset, True)
+    logits_test = flowNN3Layer(tf_test_dataset, True)
 
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
@@ -136,11 +158,11 @@ with tf.Session(graph=graph) as session:
         if (step % 500 == 0):
             print("Minibatch loss at step %d: %f" % (step, l))
             print("Minibatch accuracy: %.1f%%" % accuracy(train_prediction.eval(
-                feed_dict={tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob:1.0}), batch_labels))
+                feed_dict={tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob : 1.0}), batch_labels))
             print("Learn rate: ", lr)
 
             # Calling .eval() on valid_prediction is basically like calling run(), but
             # just to get that one numpy array. Note that it recomputes all its graph dependencies.
-            print("Validation accuracy: %.1f%%" % accuracy(valid_prediction.eval(feed_dict={keep_prob:1.0}), valid_labels))
+            print("Validation accuracy: %.1f%%" % accuracy(valid_prediction.eval(feed_dict={keep_prob : 1.0}), valid_labels))
 
     print("Test accuracy: %.1f%%" % accuracy(test_prediction.eval(feed_dict={keep_prob:1.0}), test_labels))
