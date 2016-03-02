@@ -6,6 +6,7 @@ import tensorflow as tf
 from six.moves import cPickle as pickle
 from six.moves import range
 
+# The pickle file location will depend on where you put your dataset
 pickle_file = '/home/tempuser/PycharmProjects/tf-class-1/notMNIST.pickle'
 
 with open(pickle_file, 'rb') as f:
@@ -21,15 +22,16 @@ with open(pickle_file, 'rb') as f:
     print('Validation set', valid_dataset.shape, valid_labels.shape)
     print('Test set', test_dataset.shape, test_labels.shape)
 
-
-image_size = 28 #squared
+image_size = 28 # squared
 num_labels = 10
+
 
 def reformat(dataset, labels):
     dataset = dataset.reshape((-1, image_size * image_size)).astype(np.float32)
     # Map 0 to [1.0, 0.0, 0.0 ...], 1 to [0.0, 1.0, 0.0 ...]
     labels = (np.arange(num_labels) == labels[:,None]).astype(np.float32)
     return dataset, labels
+
 
 def accuracy(predictions, labels):
     return (100.0 * np.sum(np.argmax(predictions, 1) == np.argmax(labels, 1))
@@ -42,22 +44,16 @@ print('Training set', train_dataset.shape, train_labels.shape)
 print('Validation set', valid_dataset.shape, valid_labels.shape)
 print('Test set', test_dataset.shape, test_labels.shape)
 
-# The knobs and dials!
+# The knobs
 batch_size = 128
-hidden_nodes = 2048 #tried double the cells
+hidden_nodes = 2048
 hidden_nodes_l2 = 512
 starter_learn_rate = 0.5
 reg_beta = 5e-4
 num_steps = 200001
 
-#flow the data sets thru the layers
-def flowNN2Layer(d_set):
-    # Training computation.
-    h_logits = tf.nn.relu(tf.matmul(d_set, weights_1) + biases_1)
-    logits_dropout_in = tf.matmul(h_logits, weights_2) + biases_2
-    logits = tf.nn.dropout(logits_dropout_in, keep_prob)
-    return logits
 
+# Flow the data sets thru the layers
 def flowNN3Layer(d_set, use_dropout):
     # Training computation.
 
@@ -79,7 +75,7 @@ def flowNN3Layer(d_set, use_dropout):
 
     return h3_logits
 
-# graph with stochastic gradient descent
+# Graph with stochastic gradient descent
 graph = tf.Graph()
 with graph.as_default():
     # Input data. For the training data, we use a placeholder that will be fed
@@ -101,7 +97,7 @@ with graph.as_default():
     weights_3 = tf.Variable(tf.truncated_normal([hidden_nodes_l2, num_labels], stddev=0.01))
     biases_3 = tf.Variable(tf.zeros([num_labels]))
 
-    # computation
+    # Computation
     logits = flowNN3Layer(tf_train_dataset, True)
     logits_valid = flowNN3Layer(tf_valid_dataset, True)
     logits_test = flowNN3Layer(tf_test_dataset, True)
@@ -109,7 +105,7 @@ with graph.as_default():
     loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits, tf_train_labels))
 
     # L2 regularization for the fully connected parameters.
-    #https://tensorflow.googlesource.com/tensorflow/+/master/tensorflow/models/image/mnist/convolutional.py
+    # https://tensorflow.googlesource.com/tensorflow/+/master/tensorflow/models/image/mnist/convolutional.py
     regularizers = (tf.nn.l2_loss(weights_1) + tf.nn.l2_loss(biases_1) +
                   tf.nn.l2_loss(weights_2) + tf.nn.l2_loss(biases_2))
     # Add the regularization term to the loss.
@@ -131,7 +127,7 @@ train_prediction = tf.nn.softmax(logits)
 valid_prediction = tf.nn.softmax(logits_valid)
 test_prediction = tf.nn.softmax(logits_test)
 
-#let's run it
+# Let's run it
 with tf.Session(graph=graph) as session:
 
     writer = tf.train.SummaryWriter("/tmp/notmnist_logs", session.graph_def)
@@ -151,11 +147,11 @@ with tf.Session(graph=graph) as session:
         # Prepare a dictionary telling the session where to feed the minibatch.
         # The key of the dictionary is the placeholder node of the graph to be fed,
         # and the value is the numpy array to feed to it.
-        feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob : 0.5 }
+        feed_dict = {tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob : 0.5}
         _, l, predictions, merged_summary, lr = session.run([optimizer, loss, train_prediction, merged, learn_rate], feed_dict=feed_dict)
         writer.add_summary(merged_summary, step)
 
-        if (step % 500 == 0):
+        if step % 500 == 0:
             print("Minibatch loss at step %d: %f" % (step, l))
             print("Minibatch accuracy: %.1f%%" % accuracy(train_prediction.eval(
                 feed_dict={tf_train_dataset : batch_data, tf_train_labels : batch_labels, keep_prob : 1.0}), batch_labels))
